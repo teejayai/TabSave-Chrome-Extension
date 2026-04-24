@@ -10,7 +10,7 @@
     <main id="app" class="popup-shell">
       <section class="popup-frame" aria-label="TabSave popup">
         <header class="popup-topbar">
-          <div class="popup-logo" aria-label="Tab Save">
+          <div class="popup-logo" aria-label="TabSave">
             <span class="popup-logo__mark" aria-hidden="true">
               <span class="popup-logo__grid">
                 <span class="popup-logo__cell popup-logo__cell--outline"></span>
@@ -19,7 +19,7 @@
                 <span class="popup-logo__cell popup-logo__cell--fill"></span>
               </span>
             </span>
-            <span class="popup-logo__wordmark">Tab Save</span>
+            <span class="popup-logo__wordmark">TabSave</span>
           </div>
           <div id="tab-count-badge" class="count-badge" aria-live="polite">0 Tabs</div>
         </header>
@@ -38,11 +38,7 @@
         </section>
 
         <section class="popup-toolbar" aria-label="Group controls">
-          <label class="group-select" for="group-selector">
-            <span class="sr-only">Save to group</span>
-            <select id="group-selector" class="group-select__input"></select>
-            <span class="group-select__chevron" aria-hidden="true"></span>
-          </label>
+          <div id="group-selector-slot" class="group-selector-slot" aria-label="Save to group"></div>
           <div id="new-group-slot" class="new-group-slot"></div>
         </section>
 
@@ -51,6 +47,7 @@
           <div id="groups-list" class="group-list"></div>
         </section>
       </section>
+      <div id="overlay-slot" class="overlay-slot" aria-hidden="true"></div>
     </main>
     <script type="module" src="./popup.js"></script>
   </body>

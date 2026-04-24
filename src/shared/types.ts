@@ -51,6 +51,13 @@ export interface OpenTabMessage {
   };
 }
 
+export interface OpenTabNewWindowMessage {
+  type: "OPEN_TAB_NEW_WINDOW";
+  payload: {
+    tabId: string;
+  };
+}
+
 export interface OpenGroupMessage {
   type: "OPEN_GROUP";
   payload: {
@@ -98,6 +105,7 @@ export type BackgroundMessage =
   | SaveTabMessage
   | SaveWindowMessage
   | OpenTabMessage
+  | OpenTabNewWindowMessage
   | OpenGroupMessage
   | OpenGroupNewWindowMessage
   | CreateCustomGroupMessage

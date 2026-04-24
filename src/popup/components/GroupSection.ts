@@ -7,6 +7,8 @@ export interface GroupSectionProps {
   expanded: boolean;
   menuOpen: boolean;
   confirmDelete: boolean;
+  activeTabMenuId: string | null;
+  confirmDeleteTabId: string | null;
 }
 
 export function renderGroupSection(props: GroupSectionProps): HTMLElement {
@@ -67,7 +69,13 @@ export function renderGroupSection(props: GroupSectionProps): HTMLElement {
     panel.append(divider);
 
     for (const tab of props.tabs) {
-      panel.append(renderTabCard({ tab }));
+      panel.append(
+        renderTabCard({
+          tab,
+          menuOpen: props.activeTabMenuId === tab.id,
+          confirmDelete: props.confirmDeleteTabId === tab.id
+        })
+      );
     }
 
     section.append(panel);

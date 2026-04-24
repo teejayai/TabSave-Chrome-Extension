@@ -128,6 +128,9 @@ export async function handleRuntimeMessage(
     case "OPEN_TAB":
       await openSingleSavedTab(message.payload.tabId);
       return { ok: true };
+    case "OPEN_TAB_NEW_WINDOW":
+      await openSingleSavedTabInNewWindow(message.payload.tabId);
+      return { ok: true };
     case "OPEN_GROUP":
       await openGroupInCurrentWindow(message.payload.groupName);
       return { ok: true };
@@ -244,7 +247,8 @@ export async function createCustomGroup(name: string): Promise<GroupMeta> {
   const group: GroupMeta = {
     name: trimmed,
     createdAt: Date.now(),
-    type: "custom"
+    type: "custom",
+    color: getRandomChromeGroupColor()
   };
 
   await saveGroup(group);
@@ -260,6 +264,17 @@ export async function openSingleSavedTab(tabId: string): Promise<void> {
   }
 
   await chrome.tabs.create({ url: tab.url });
+}
+
+export async function openSingleSavedTabInNewWindow(tabId: string): Promise<void> {
+  const tabs = await getTabs();
+  const tab = tabs.find((item) => item.id === tabId);
+
+  if (!tab?.url) {
+    return;
+  }
+
+  await chrome.windows.create({ url: tab.url });
 }
 
 export async function openGroupInCurrentWindow(groupName: string): Promise<void> {
@@ -470,8 +485,25 @@ async function saveAutoGroupMeta(groupName: string): Promise<void> {
   await saveGroup({
     name: groupName,
     createdAt: Date.now(),
-    type: "auto"
+    type: "auto",
+    color: getRandomChromeGroupColor()
   });
+}
+
+function getRandomChromeGroupColor(): chrome.tabGroups.ColorEnum {
+  const colors: chrome.tabGroups.ColorEnum[] = [
+    "grey",
+    "blue",
+    "red",
+    "yellow",
+    "green",
+    "pink",
+    "purple",
+    "cyan",
+    "orange"
+  ];
+
+  return colors[Math.floor(Math.random() * colors.length)] ?? "blue";
 }
 
 function isInternalUrl(url: string): boolean {

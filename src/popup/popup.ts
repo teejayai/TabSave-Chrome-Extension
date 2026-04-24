@@ -8,6 +8,7 @@ export interface PopupState {
   tabs: SavedTab[];
   groupedTabs: GroupedTabs;
   selectedGroupName: string;
+  isGroupSelectOpen: boolean;
   isCreatingGroup: boolean;
   groupDraft: string;
   validationMessage: string | null;
@@ -18,7 +19,11 @@ export interface PopupState {
   expandedGroups: Set<string>;
   activeMenuGroupName: string | null;
   confirmDeleteGroupName: string | null;
+  activeTabMenuId: string | null;
+  confirmDeleteTabId: string | null;
 }
+
+let toastTimeoutId: number | null = null;
 
 export function bootstrapPopup(): void {
   document.addEventListener("DOMContentLoaded", () => {
@@ -39,13 +44,16 @@ export function createInitialState(): PopupState {
     tabs: [],
     groupedTabs: {},
     selectedGroupName: "auto",
+    isGroupSelectOpen: false,
     isCreatingGroup: false,
     groupDraft: "",
     validationMessage: null,
     toast: null,
     expandedGroups: new Set<string>(),
     activeMenuGroupName: null,
-    confirmDeleteGroupName: null
+    confirmDeleteGroupName: null,
+    activeTabMenuId: null,
+    confirmDeleteTabId: null
   };
 }
 
@@ -54,31 +62,21 @@ export function renderPopup(state: PopupState): void {
   renderToolbar(state);
   renderToast(state);
   renderGroups(state);
+  renderOverlayState(state);
 }
 
 function renderHeader(state: PopupState): void {
   const badge = getRequiredElement("tab-count-badge");
-  const count = state.tabs.length;
-  badge.textContent = `${count} Tab${count === 1 ? "" : "s"}`;
+  const count = resolveDisplayOrder(state).length;
+  badge.textContent = `${count} Tab Group${count === 1 ? "" : "s"}`;
 }
 
 function renderToolbar(state: PopupState): void {
-  const select = getRequiredElement("group-selector");
-
-  if (!(select instanceof HTMLSelectElement)) {
-    throw new Error("Group selector element is not a select.");
-  }
-
+  const selector = getRequiredElement("group-selector-slot");
   const groupNames = Array.from(new Set(state.groups.map((group) => group.name)));
-  select.innerHTML = [
-    `<option value="auto"${state.selectedGroupName === "auto" ? " selected" : ""}>Auto-group by domain</option>`,
-    ...groupNames.map(
-      (groupName) =>
-        `<option value="${escapeHtml(groupName)}"${
-          state.selectedGroupName === groupName ? " selected" : ""
-        }>${escapeHtml(groupName)}</option>`
-    )
-  ].join("");
+  selector.replaceChildren(
+    renderGroupSelector(state.selectedGroupName, groupNames, state.isGroupSelectOpen)
+  );
 
   const slot = getRequiredElement("new-group-slot");
   slot.replaceChildren();
@@ -93,6 +91,61 @@ function renderToolbar(state: PopupState): void {
   } else {
     slot.append(renderNewGroupButton());
   }
+}
+
+function renderGroupSelector(
+  selectedGroupName: string,
+  groupNames: string[],
+  open: boolean
+): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = `group-select${open ? " group-select--open" : ""}`;
+  const selectedLabel =
+    selectedGroupName === "auto" ? "Auto-group by domain" : selectedGroupName;
+
+  wrapper.innerHTML = `
+    <button
+      type="button"
+      class="group-select__trigger"
+      data-action="toggle-group-selector"
+      aria-haspopup="listbox"
+      aria-expanded="${String(open)}"
+    >
+      <span class="group-select__label">${escapeHtml(selectedLabel)}</span>
+      <span class="group-select__chevron" aria-hidden="true"></span>
+    </button>
+  `;
+
+  if (open) {
+    const menu = document.createElement("div");
+    menu.className = "group-select__menu";
+    menu.setAttribute("role", "listbox");
+    menu.innerHTML = [
+      renderGroupOption("auto", "Auto-group by domain", selectedGroupName === "auto"),
+      ...groupNames.map((groupName) =>
+        renderGroupOption(groupName, groupName, selectedGroupName === groupName)
+      )
+    ].join("");
+    wrapper.append(menu);
+  }
+
+  return wrapper;
+}
+
+function renderGroupOption(value: string, label: string, selected: boolean): string {
+  return `
+    <button
+      type="button"
+      class="group-select__option"
+      role="option"
+      aria-selected="${String(selected)}"
+      data-action="select-group-option"
+      data-group-value="${escapeHtml(value)}"
+    >
+      <span>${escapeHtml(label)}</span>
+      ${selected ? `<span class="group-select__check" aria-hidden="true">${renderCheckIcon()}</span>` : ""}
+    </button>
+  `;
 }
 
 function renderToast(state: PopupState): void {
@@ -131,7 +184,9 @@ function renderGroups(state: PopupState): void {
         tabs: state.groupedTabs[groupName] ?? [],
         expanded: state.expandedGroups.has(groupName),
         menuOpen: state.activeMenuGroupName === groupName,
-        confirmDelete: state.confirmDeleteGroupName === groupName
+        confirmDelete: state.confirmDeleteGroupName === groupName,
+        activeTabMenuId: state.activeTabMenuId,
+        confirmDeleteTabId: state.confirmDeleteTabId
       })
     );
   }
@@ -194,6 +249,16 @@ export async function hydrateState(state: PopupState): Promise<void> {
   if (state.confirmDeleteGroupName && !visibleGroups.has(state.confirmDeleteGroupName)) {
     state.confirmDeleteGroupName = null;
   }
+
+  const visibleTabIds = new Set(tabs.map((tab) => tab.id));
+
+  if (state.activeTabMenuId && !visibleTabIds.has(state.activeTabMenuId)) {
+    state.activeTabMenuId = null;
+  }
+
+  if (state.confirmDeleteTabId && !visibleTabIds.has(state.confirmDeleteTabId)) {
+    state.confirmDeleteTabId = null;
+  }
 }
 
 export function bindPopupEvents(state: PopupState): void {
@@ -202,16 +267,25 @@ export function bindPopupEvents(state: PopupState): void {
   root.addEventListener("click", (event) => {
     const target = event.target;
 
-    if (!(target instanceof HTMLElement)) {
+    if (!(target instanceof Element)) {
       return;
     }
 
-    const actionable = target.closest<HTMLElement>("[data-action]");
+    const actionable = target.closest("[data-action]");
 
-    if (!actionable) {
-      if (!target.closest(".group-options") && !target.closest(".confirm-popover")) {
+    if (!(actionable instanceof HTMLElement)) {
+      if (
+        !target.closest(".group-options") &&
+        !target.closest(".confirm-popover") &&
+        !target.closest(".tab-inline-panel") &&
+        !target.closest(".group-select") &&
+        !target.closest(".new-group-modal__dialog")
+      ) {
         state.activeMenuGroupName = null;
         state.confirmDeleteGroupName = null;
+        state.activeTabMenuId = null;
+        state.confirmDeleteTabId = null;
+        state.isGroupSelectOpen = false;
         renderPopup(state);
       }
       return;
@@ -226,20 +300,14 @@ export function bindPopupEvents(state: PopupState): void {
     void handleAction(action, actionable, state);
   });
 
-  root.addEventListener("change", (event) => {
-    const target = event.target;
-
-    if (target instanceof HTMLSelectElement && target.id === "group-selector") {
-      state.selectedGroupName = target.value || "auto";
-    }
-  });
-
   root.addEventListener("input", (event) => {
     const target = event.target;
 
     if (target instanceof HTMLInputElement && target.id === "new-group-input") {
       state.groupDraft = target.value;
       state.validationMessage = null;
+      renderPopup(state);
+      focusNewGroupInput(false);
     }
   });
 
@@ -278,6 +346,7 @@ async function handleAction(
       return;
     case "new-group":
       state.isCreatingGroup = true;
+      state.isGroupSelectOpen = false;
       state.validationMessage = null;
       state.toast = null;
       renderPopup(state);
@@ -289,24 +358,66 @@ async function handleAction(
       state.validationMessage = null;
       renderPopup(state);
       return;
-    case "toggle-group":
-      toggleExpandedGroup(state, target.dataset.groupName || "");
+    case "toggle-group-selector":
+      state.isGroupSelectOpen = !state.isGroupSelectOpen;
       state.activeMenuGroupName = null;
       state.confirmDeleteGroupName = null;
+      state.activeTabMenuId = null;
+      state.confirmDeleteTabId = null;
+      renderPopup(state);
+      return;
+    case "select-group-option":
+      state.selectedGroupName = target.dataset.groupValue || "auto";
+      state.isGroupSelectOpen = false;
+      renderPopup(state);
+      return;
+    case "toggle-group":
+      toggleExpandedGroup(state, target.dataset.groupName || "");
+      state.isGroupSelectOpen = false;
+      state.activeMenuGroupName = null;
+      state.confirmDeleteGroupName = null;
+      state.activeTabMenuId = null;
+      state.confirmDeleteTabId = null;
       renderPopup(state);
       return;
     case "toggle-open-menu":
+      state.isGroupSelectOpen = false;
       toggleGroupMenu(state, target.dataset.groupName || "");
       state.confirmDeleteGroupName = null;
+      state.activeTabMenuId = null;
+      state.confirmDeleteTabId = null;
       renderPopup(state);
       return;
     case "toggle-delete-group":
+      state.isGroupSelectOpen = false;
       toggleDeleteConfirm(state, target.dataset.groupName || "");
       state.activeMenuGroupName = null;
+      state.activeTabMenuId = null;
+      state.confirmDeleteTabId = null;
       renderPopup(state);
       return;
     case "cancel-delete-group":
       state.confirmDeleteGroupName = null;
+      renderPopup(state);
+      return;
+    case "toggle-open-tab-menu":
+      state.isGroupSelectOpen = false;
+      state.activeMenuGroupName = null;
+      state.confirmDeleteGroupName = null;
+      toggleTabMenu(state, target.dataset.tabId || "");
+      state.confirmDeleteTabId = null;
+      renderPopup(state);
+      return;
+    case "toggle-delete-tab":
+      state.isGroupSelectOpen = false;
+      state.activeMenuGroupName = null;
+      state.confirmDeleteGroupName = null;
+      state.activeTabMenuId = null;
+      toggleTabDeleteConfirm(state, target.dataset.tabId || "");
+      renderPopup(state);
+      return;
+    case "cancel-delete-tab":
+      state.confirmDeleteTabId = null;
       renderPopup(state);
       return;
     case "open-group":
@@ -343,6 +454,18 @@ async function handleAction(
           }
         },
         "Tab opened"
+      );
+      return;
+    case "open-tab-new-window":
+      await performMutation(
+        state,
+        {
+          type: "OPEN_TAB_NEW_WINDOW",
+          payload: {
+            tabId: target.dataset.tabId || ""
+          }
+        },
+        "Opened in new window"
       );
       return;
     case "delete-tab":
@@ -406,18 +529,12 @@ async function submitNewGroup(state: PopupState): Promise<void> {
     state.groupDraft = "";
     state.validationMessage = null;
     state.isCreatingGroup = false;
-    state.toast = {
-      tone: "success",
-      message: "New group created"
-    };
+    showToast(state, "success", "New group created");
     await hydrateState(state);
     renderPopup(state);
   } catch (error) {
     state.validationMessage = error instanceof Error ? error.message : "Failed to create group.";
-    state.toast = {
-      tone: "error",
-      message: "Network Error"
-    };
+    showToast(state, "error", "Network Error");
     renderPopup(state);
     focusNewGroupInput();
   }
@@ -431,18 +548,15 @@ async function performMutation(
   try {
     await sendMessage(message);
     await hydrateState(state);
-    state.toast = {
-      tone: "success",
-      message: successMessage
-    };
+    showToast(state, "success", successMessage);
+    state.isGroupSelectOpen = false;
     state.activeMenuGroupName = null;
     state.confirmDeleteGroupName = null;
+    state.activeTabMenuId = null;
+    state.confirmDeleteTabId = null;
     renderPopup(state);
   } catch (error) {
-    state.toast = {
-      tone: "error",
-      message: error instanceof Error ? error.message : "Network Error"
-    };
+    showToast(state, "error", error instanceof Error ? error.message : "Network Error");
     renderPopup(state);
   }
 }
@@ -468,6 +582,14 @@ function toggleGroupMenu(state: PopupState, groupName: string): void {
 function toggleDeleteConfirm(state: PopupState, groupName: string): void {
   state.confirmDeleteGroupName =
     state.confirmDeleteGroupName === groupName ? null : groupName;
+}
+
+function toggleTabMenu(state: PopupState, tabId: string): void {
+  state.activeTabMenuId = state.activeTabMenuId === tabId ? null : tabId;
+}
+
+function toggleTabDeleteConfirm(state: PopupState, tabId: string): void {
+  state.confirmDeleteTabId = state.confirmDeleteTabId === tabId ? null : tabId;
 }
 
 function groupTabsByName(tabs: SavedTab[]): GroupedTabs {
@@ -510,6 +632,38 @@ function getRenderableGroup(state: PopupState, groupName: string): GroupMeta | n
   };
 }
 
+function renderOverlayState(state: PopupState): void {
+  const overlay = getRequiredElement("overlay-slot");
+  overlay.replaceChildren();
+
+  if (!state.isCreatingGroup) {
+    return;
+  }
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.dataset.action = "cancel-new-group";
+  overlay.append(backdrop);
+}
+
+function showToast(
+  state: PopupState,
+  tone: "success" | "error",
+  message: string
+): void {
+  state.toast = { tone, message };
+
+  if (toastTimeoutId !== null) {
+    window.clearTimeout(toastTimeoutId);
+  }
+
+  toastTimeoutId = window.setTimeout(() => {
+    state.toast = null;
+    renderPopup(state);
+    toastTimeoutId = null;
+  }, 2600);
+}
+
 async function sendMessage(message: BackgroundMessage): Promise<void> {
   const response = (await chrome.runtime.sendMessage(message)) as
     | { ok: true }
@@ -530,12 +684,18 @@ function getRequiredElement(id: string): HTMLElement {
   return element;
 }
 
-function focusNewGroupInput(): void {
+function focusNewGroupInput(select = true): void {
   const input = document.getElementById("new-group-input");
 
   if (input instanceof HTMLInputElement) {
     input.focus();
-    input.select();
+
+    if (select) {
+      input.select();
+    } else {
+      const length = input.value.length;
+      input.setSelectionRange(length, length);
+    }
   }
 }
 
@@ -546,6 +706,14 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function renderCheckIcon(): string {
+  return `
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M3.5 7.29L5.83 9.62L10.5 4.96" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
 }
 
 bootstrapPopup();

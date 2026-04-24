@@ -5,37 +5,49 @@ export interface NewGroupInputProps {
 
 export function renderNewGroupInput(props: NewGroupInputProps): HTMLElement {
   const wrapper = document.createElement("form");
-  wrapper.className = "new-group-input";
+  wrapper.className = "new-group-modal";
   wrapper.id = "new-group-form";
   wrapper.innerHTML = `
-    <div class="new-group-input__row">
-      <input
-        id="new-group-input"
-        class="new-group-input__field"
-        name="groupName"
-        type="text"
-        placeholder="Group name"
-        value="${escapeHtml(props.value)}"
-        autocomplete="off"
-      />
-      <button type="submit" class="new-group-input__action new-group-input__action--confirm" aria-label="Confirm new group">
-        ${renderCheckIcon()}
-      </button>
-      <button type="button" class="new-group-input__action" data-action="cancel-new-group" aria-label="Cancel new group">
-        ${renderCloseIcon()}
-      </button>
+    <div class="new-group-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="new-group-title">
+      <div class="new-group-modal__header">
+        <h3 id="new-group-title" class="new-group-modal__title">CREATE NEW GROUP</h3>
+        <button
+          type="button"
+          class="new-group-modal__close"
+          data-action="cancel-new-group"
+          aria-label="Close new group dialog"
+        >
+          ${renderCloseIcon()}
+        </button>
+      </div>
+      <div class="new-group-modal__body">
+        <input
+          id="new-group-input"
+          class="new-group-modal__field"
+          name="groupName"
+          type="text"
+          placeholder="Enter Tab Group Name"
+          value="${escapeHtml(props.value)}"
+          autocomplete="off"
+        />
+        ${
+          props.validationMessage
+            ? `<p class="new-group-modal__validation">${escapeHtml(props.validationMessage)}</p>`
+            : ""
+        }
+      </div>
+      <div class="new-group-modal__footer">
+        <button
+          type="submit"
+          class="new-group-modal__submit${props.value.trim() ? "" : " new-group-modal__submit--disabled"}"
+          ${props.value.trim() ? "" : "disabled"}
+        >
+          Save Group
+        </button>
+      </div>
     </div>
-    ${props.validationMessage ? `<p class="new-group-input__validation">${escapeHtml(props.validationMessage)}</p>` : ""}
   `;
   return wrapper;
-}
-
-function renderCheckIcon(): string {
-  return `
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M3.5 7.29L5.83 9.62L10.5 4.96" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
 }
 
 function renderCloseIcon(): string {
