@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "TabSave",
+  "version": "1.0.0",
+  "description": "Save, group, and restore browser tabs as sessions.",
+  "permissions": ["tabs", "storage", "tabGroups", "contextMenus", "windows"],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "public/icons/icon16.png",
+      "48": "public/icons/icon48.png",
+      "128": "public/icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "public/icons/icon16.png",
+    "48": "public/icons/icon48.png",
+    "128": "public/icons/icon128.png"
+  }
+}

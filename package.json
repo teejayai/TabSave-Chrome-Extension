@@ -1,0 +1,26 @@
+{
+  "name": "tabsave-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TabSave Chrome Extension scaffold based on the MV3 PRD.",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build:js": "node ./scripts/build.mjs",
+    "build:css": "tailwindcss -i ./src/styles/popup.css -o ./dist/src/styles/popup.css --minify",
+    "build": "npm run clean && npm run build:js && npm run build:css",
+    "watch:js": "node ./scripts/build.mjs --watch",
+    "watch:css": "tailwindcss -i ./src/styles/popup.css -o ./dist/src/styles/popup.css --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.40",
+    "esbuild": "^0.25.12",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3"
+  },
+  "main": "tailwind.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

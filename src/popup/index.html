@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TabSave</title>
+    <link rel="stylesheet" href="../styles/popup.css" />
+  </head>
+  <body>
+    <main id="app" class="popup-shell">
+      <section class="popup-frame" aria-label="TabSave popup">
+        <header class="popup-topbar">
+          <div class="popup-logo" aria-label="Tab Save">
+            <span class="popup-logo__mark" aria-hidden="true">
+              <span class="popup-logo__grid">
+                <span class="popup-logo__cell popup-logo__cell--outline"></span>
+                <span class="popup-logo__cell popup-logo__cell--fill"></span>
+                <span class="popup-logo__cell popup-logo__cell--fill"></span>
+                <span class="popup-logo__cell popup-logo__cell--fill"></span>
+              </span>
+            </span>
+            <span class="popup-logo__wordmark">Tab Save</span>
+          </div>
+          <div id="tab-count-badge" class="count-badge" aria-live="polite">0 Tabs</div>
+        </header>
+
+        <div id="toast-region" class="toast-region" aria-live="polite"></div>
+
+        <section class="popup-actions" aria-label="Save actions">
+          <button type="button" class="action-button action-button--primary" data-action="save-tab">
+            <span class="action-button__icon" aria-hidden="true"></span>
+            <span>Save Tab</span>
+          </button>
+          <button type="button" class="action-button action-button--secondary" data-action="save-window">
+            <span class="action-button__icon action-button__icon--stack" aria-hidden="true"></span>
+            <span>Save All Tabs</span>
+          </button>
+        </section>
+
+        <section class="popup-toolbar" aria-label="Group controls">
+          <label class="group-select" for="group-selector">
+            <span class="sr-only">Save to group</span>
+            <select id="group-selector" class="group-select__input"></select>
+            <span class="group-select__chevron" aria-hidden="true"></span>
+          </label>
+          <div id="new-group-slot" class="new-group-slot"></div>
+        </section>
+
+        <section class="popup-content" aria-labelledby="grouped-tabs-heading">
+          <h2 id="grouped-tabs-heading" class="section-heading">GROUPED TABS</h2>
+          <div id="groups-list" class="group-list"></div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>
