@@ -182,25 +182,25 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 30px;
-    padding: 6px 12px;
-    border-radius: 999px;
+    min-height: 34px;
+    padding: 6px 16px;
+    border: 0.5px solid var(--popup-stroke);
+    border-radius: var(--radius-sm);
+    background: #151515;
     box-shadow: var(--popup-shadow-soft);
     font-size: 12px;
     font-weight: 400;
-    line-height: 18px;
+    line-height: 1;
     letter-spacing: -0.24px;
     white-space: nowrap;
   }
 
   .toast--success {
-    background: var(--popup-success-bg);
-    color: var(--popup-success-text);
+    color: #4ade80; /* Success green */
   }
 
   .toast--error {
-    background: var(--popup-error-bg);
-    color: var(--popup-error-text);
+    color: #f87171; /* Error red */
   }
 
   .popup-actions {
@@ -512,9 +512,10 @@
   }
 
   .new-group-modal {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 32;
+    pointer-events: auto;
   }
 
   .new-group-modal__dialog {
@@ -1094,7 +1095,7 @@
   .modal-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.25);
     pointer-events: auto;
   }
 }

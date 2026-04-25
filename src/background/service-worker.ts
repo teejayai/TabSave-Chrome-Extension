@@ -123,7 +123,7 @@ export async function handleRuntimeMessage(
       await handleSaveCurrentTab(message.payload?.targetGroup ?? null);
       return { ok: true };
     case "SAVE_WINDOW":
-      await handleSaveWindow();
+      await handleSaveWindow((message as any).payload?.targetGroup ?? null);
       return { ok: true };
     case "OPEN_TAB":
       await openSingleSavedTab(message.payload.tabId);
@@ -156,11 +156,11 @@ export async function handleRuntimeMessage(
 
 export async function handleSaveCurrentTab(
   targetGroup: SaveTarget
-): Promise<SavedTab | null> {
+): Promise<SavedTab> {
   const currentTab = await getCurrentTab();
 
   if (!currentTab.url || isInternalUrl(currentTab.url)) {
-    return null;
+    throw new Error("This page doesn't have a web address to save.");
   }
 
   const groups = await getGroups();
@@ -178,7 +178,7 @@ export async function handleSaveCurrentTab(
   return savedTab;
 }
 
-export async function handleSaveWindow(): Promise<SavedTab[]> {
+export async function handleSaveWindow(targetGroup?: SaveTarget): Promise<SavedTab[]> {
   const tabs = await getAllWindowTabs();
   const saveableTabs = tabs.filter((tab) => tab.url && !isInternalUrl(tab.url));
 
@@ -193,7 +193,8 @@ export async function handleSaveWindow(): Promise<SavedTab[]> {
   const tabsByGroup = new Map<string, number[]>();
 
   for (const tab of saveableTabs) {
-    const groupName = extractDomain(tab.url || "");
+    const groupName =
+      targetGroup && targetGroup !== "auto" ? targetGroup : extractDomain(tab.url || "");
 
     const savedTab = buildSavedTab(tab, groupName, "window", sessionId);
     savedTabs.push(savedTab);
@@ -244,15 +245,16 @@ export async function createCustomGroup(name: string): Promise<GroupMeta> {
     throw new Error(`Group "${trimmed}" already exists.`);
   }
 
+  const color = getRandomChromeGroupColor();
   const group: GroupMeta = {
     name: trimmed,
     createdAt: Date.now(),
     type: "custom",
-    color: getRandomChromeGroupColor()
+    color
   };
 
   await saveGroup(group);
-  return syncCustomGroupToChrome(group);
+  return group;
 }
 
 export async function openSingleSavedTab(tabId: string): Promise<void> {
@@ -573,6 +575,27 @@ function registerChromeSyncListeners(): void {
   if (chrome.tabs?.onCreated) {
     chrome.tabs.onCreated.addListener((tab) => {
       void syncChromeGroupForTab(tab);
+    });
+  }
+
+  if (chrome.tabs?.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      // Sync if the tab was moved into/out of a group, or if its URL changed while in a group
+      if (
+        changeInfo.groupId !== undefined ||
+        (changeInfo.url && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+      ) {
+        void syncChromeGroupForTab(tab);
+      }
+    });
+  }
+
+  if (chrome.tabs?.onRemoved) {
+    chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+      // If a tab is removed, we might need to sync the group it was in.
+      // Since we don't have the tab object anymore, we can't easily know the group.
+      // However, chrome.tabGroups events or a general sync might be needed.
+      // For now, onRemoved is less critical than onUpdated for *adding* tabs.
     });
   }
 

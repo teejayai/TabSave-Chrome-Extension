@@ -70,10 +70,7 @@ export async function inheritExistingTabGroups(): Promise<{
   tabs: SavedTab[];
   groups: GroupMeta[];
 }> {
-  if (
-    typeof chrome.windows?.getAll !== "function" ||
-    typeof chrome.tabGroups?.query !== "function"
-  ) {
+  if (typeof chrome.tabGroups?.query !== "function") {
     return {
       tabs: [],
       groups: []
@@ -81,41 +78,37 @@ export async function inheritExistingTabGroups(): Promise<{
   }
 
   try {
-    const windows = await chrome.windows.getAll({ populate: false });
+    const allChromeGroups = await chrome.tabGroups.query({});
     const importedTabs: SavedTab[] = [];
     const importedGroups: GroupMeta[] = [];
     const usedNames = new Set<string>();
 
-    for (const windowRef of windows) {
-      const chromeGroups = await chrome.tabGroups.query({ windowId: windowRef.id });
+    for (const group of allChromeGroups) {
+      const allTabsInGroup = await chrome.tabs.query({ groupId: group.id });
+      const validTabs = allTabsInGroup.filter((tab) => isSaveableUrl(tab.url));
 
-      for (const group of chromeGroups) {
-        const memberTabs = await chrome.tabs.query({ groupId: group.id });
-        const validTabs = memberTabs.filter((tab) => isSaveableUrl(tab.url));
+      if (validTabs.length === 0) {
+        continue;
+      }
 
-        if (validTabs.length === 0) {
-          continue;
-        }
+      const baseName =
+        group.title?.trim() || extractDomain(validTabs[0]?.url ?? "") || `Group ${group.id}`;
+      const groupName = ensureUniqueGroupName(baseName, usedNames);
 
-        const baseName =
-          group.title?.trim() || extractDomain(validTabs[0]?.url ?? "") || `Group ${group.id}`;
-        const groupName = ensureUniqueGroupName(baseName, usedNames);
+      importedGroups.push({
+        name: groupName,
+        createdAt: Date.now(),
+        color: group.color,
+        type: "inherited",
+        inherited: true,
+        originalGroupId: group.id
+      });
 
-        importedGroups.push({
-          name: groupName,
-          createdAt: Date.now(),
-          color: group.color,
-          type: "inherited",
-          inherited: true,
-          originalGroupId: group.id
-        });
-
-        for (const tab of validTabs) {
-          const savedTab = buildSavedTab(tab, groupName, "inherited");
-          savedTab.groupColor = group.color;
-          savedTab.importedGroupId = group.id;
-          importedTabs.push(savedTab);
-        }
+      for (const tab of validTabs) {
+        const savedTab = buildSavedTab(tab, groupName, "inherited");
+        savedTab.groupColor = group.color;
+        savedTab.importedGroupId = group.id;
+        importedTabs.push(savedTab);
       }
     }
 

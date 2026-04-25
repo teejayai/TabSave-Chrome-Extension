@@ -27,15 +27,26 @@ let toastTimeoutId: number | null = null;
 
 export function bootstrapPopup(): void {
   document.addEventListener("DOMContentLoaded", () => {
-    void initializePopup();
+    const state = createInitialState();
+    
+    // Listen for storage changes to keep UI in sync
+    chrome.storage.onChanged.addListener(() => {
+      void hydrateState(state).then(() => renderPopup(state));
+    });
+
+    void initializePopupWithState(state);
   });
+}
+
+export async function initializePopupWithState(state: PopupState): Promise<void> {
+  await hydrateState(state);
+  renderPopup(state);
+  bindPopupEvents(state);
 }
 
 export async function initializePopup(): Promise<void> {
   const state = createInitialState();
-  await hydrateState(state);
-  renderPopup(state);
-  bindPopupEvents(state);
+  await initializePopupWithState(state);
 }
 
 export function createInitialState(): PopupState {
@@ -81,14 +92,7 @@ function renderToolbar(state: PopupState): void {
   const slot = getRequiredElement("new-group-slot");
   slot.replaceChildren();
 
-  if (state.isCreatingGroup) {
-    slot.append(
-      renderNewGroupInput({
-        value: state.groupDraft,
-        validationMessage: state.validationMessage
-      })
-    );
-  } else {
+  if (!state.isCreatingGroup) {
     slot.append(renderNewGroupButton());
   }
 }
@@ -166,12 +170,14 @@ function renderGroups(state: PopupState): void {
   const container = getRequiredElement("groups-list");
   container.replaceChildren();
 
-  if (state.tabs.length === 0) {
+  const displayOrder = resolveDisplayOrder(state);
+
+  if (displayOrder.length === 0) {
     container.append(renderEmptyState());
     return;
   }
 
-  for (const groupName of resolveDisplayOrder(state)) {
+  for (const groupName of displayOrder) {
     const group = getRenderableGroup(state, groupName);
 
     if (!group) {
@@ -342,7 +348,16 @@ async function handleAction(
       );
       return;
     case "save-window":
-      await performMutation(state, { type: "SAVE_WINDOW" }, "Window saved");
+      await performMutation(
+        state,
+        {
+          type: "SAVE_WINDOW",
+          payload: {
+            targetGroup: state.selectedGroupName
+          }
+        } as any,
+        "Window saved"
+      );
       return;
     case "new-group":
       state.isCreatingGroup = true;
@@ -533,8 +548,9 @@ async function submitNewGroup(state: PopupState): Promise<void> {
     await hydrateState(state);
     renderPopup(state);
   } catch (error) {
-    state.validationMessage = error instanceof Error ? error.message : "Failed to create group.";
-    showToast(state, "error", "Network Error");
+    const message = error instanceof Error ? error.message : "Failed to create group.";
+    state.validationMessage = message;
+    showToast(state, "error", message);
     renderPopup(state);
     focusNewGroupInput();
   }
@@ -644,6 +660,13 @@ function renderOverlayState(state: PopupState): void {
   backdrop.className = "modal-backdrop";
   backdrop.dataset.action = "cancel-new-group";
   overlay.append(backdrop);
+
+  overlay.append(
+    renderNewGroupInput({
+      value: state.groupDraft,
+      validationMessage: state.validationMessage
+    })
+  );
 }
 
 function showToast(
