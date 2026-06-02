@@ -115,32 +115,17 @@
 
   .popup-logo__mark {
     position: relative;
-    width: 19px;
-    height: 19px;
-    border-radius: 6px;
+    width: 20px;
+    height: 20px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
 
-  .popup-logo__grid {
-    display: grid;
-    grid-template-columns: repeat(2, 5.538px);
-    gap: 2px;
-    width: 13.076px;
-    height: 13.076px;
-  }
-
-  .popup-logo__cell {
-    border-radius: 2px;
-    background: linear-gradient(214.695deg, #7c2209 3.4091%, #9d3518 21.165%, #ff501f 50.517%, #9d3518 84.903%, #7c2209 98.106%);
-    box-shadow: inset 0 4.5px 0 rgba(0, 0, 0, 0.25);
-  }
-
-  .popup-logo__cell--outline {
-    background:
-      radial-gradient(circle at center, transparent 38%, rgba(255, 255, 255, 0.92) 39%, rgba(255, 255, 255, 0.92) 57%, transparent 58%),
-      linear-gradient(214.695deg, #7c2209 3.4091%, #9d3518 21.165%, #ff501f 50.517%, #9d3518 84.903%, #7c2209 98.106%);
+  .popup-logo__image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .popup-logo__wordmark {
@@ -414,11 +399,23 @@
     flex-direction: column;
     gap: 2px;
     width: 246px;
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 6px;
     border: 0.5px solid var(--popup-stroke);
     border-radius: var(--radius-sm);
     background: #121212;
     box-shadow: var(--popup-shadow-soft);
+  }
+
+  .group-select__menu::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .group-select__menu::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #2a2a2a;
   }
 
   .group-select__option {
