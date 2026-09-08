@@ -10,11 +10,11 @@
     <main id="app" class="popup-shell">
       <section class="popup-frame" aria-label="TabSave popup">
         <header class="popup-topbar">
-          <div class="popup-logo" aria-label="TabSave">
+          <div class="popup-logo" aria-label="Tab Save">
             <span class="popup-logo__mark" aria-hidden="true">
               <img src="../../public/icons/logo.svg" alt="" class="popup-logo__image" />
             </span>
-            <span class="popup-logo__wordmark">TabSave</span>
+            <span class="popup-logo__wordmark">Tab Save</span>
           </div>
           <div id="tab-count-badge" class="count-badge" aria-live="polite">0 Tabs</div>
         </header>
@@ -22,12 +22,12 @@
         <div id="toast-region" class="toast-region" aria-live="polite"></div>
 
         <section class="popup-actions" aria-label="Save actions">
-          <button type="button" class="action-button action-button--primary" data-action="save-tab">
-            <span class="action-button__icon" aria-hidden="true"></span>
+          <button type="button" class="button button--primary button--wide" data-action="save-tab">
+            <span class="button__icon" id="icon-save-tab" aria-hidden="true"></span>
             <span>Save Tab</span>
           </button>
-          <button type="button" class="action-button action-button--secondary" data-action="save-window">
-            <span class="action-button__icon action-button__icon--stack" aria-hidden="true"></span>
+          <button type="button" class="button button--secondary button--wide" data-action="save-window">
+            <span class="button__icon" id="icon-save-all" aria-hidden="true"></span>
             <span>Save All Tabs</span>
           </button>
         </section>

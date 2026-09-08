@@ -105,7 +105,7 @@ test.describe('TabSave E2E', () => {
     await popupPage.locator('#new-group-input').fill('Duplicate');
     await popupPage.locator('button[type="submit"]').click();
     
-    await expect(popupPage.locator('.new-group-modal__validation')).toHaveText('Group "Duplicate" already exists.');
+    await expect(popupPage.locator('.field__error')).toHaveText('Group "Duplicate" already exists.');
   });
 
   test('should automatically sync when a tab is added to a Chrome group', async ({ context, extensionId }) => {

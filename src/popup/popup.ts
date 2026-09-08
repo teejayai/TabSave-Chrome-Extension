@@ -1,6 +1,7 @@
 import { getGroups, getTabs } from "../shared/storage";
 import { renderGroupSection } from "./components/GroupSection";
 import { renderNewGroupInput } from "./components/NewGroupInput";
+import { renderIcon } from "./icons";
 import type { BackgroundMessage, GroupMeta, GroupedTabs, SavedTab } from "../shared/types";
 
 export interface PopupState {
@@ -69,11 +70,26 @@ export function createInitialState(): PopupState {
 }
 
 export function renderPopup(state: PopupState): void {
+  renderStaticIcons();
   renderHeader(state);
   renderToolbar(state);
   renderToast(state);
   renderGroups(state);
   renderOverlayState(state);
+}
+
+// The two save buttons live in index.html; their glyphs come from the shared set.
+function renderStaticIcons(): void {
+  const saveTab = document.getElementById("icon-save-tab");
+  const saveAll = document.getElementById("icon-save-all");
+
+  if (saveTab && !saveTab.firstChild) {
+    saveTab.innerHTML = renderIcon("add01");
+  }
+
+  if (saveAll && !saveAll.firstChild) {
+    saveAll.innerHTML = renderIcon("layers01");
+  }
 }
 
 function renderHeader(state: PopupState): void {
@@ -90,11 +106,7 @@ function renderToolbar(state: PopupState): void {
   );
 
   const slot = getRequiredElement("new-group-slot");
-  slot.replaceChildren();
-
-  if (!state.isCreatingGroup) {
-    slot.append(renderNewGroupButton());
-  }
+  slot.replaceChildren(renderNewGroupButton());
 }
 
 function renderGroupSelector(
@@ -116,7 +128,7 @@ function renderGroupSelector(
       aria-expanded="${String(open)}"
     >
       <span class="group-select__label">${escapeHtml(selectedLabel)}</span>
-      <span class="group-select__chevron" aria-hidden="true"></span>
+      <span class="group-select__chevron" aria-hidden="true">${renderIcon("chevronDown")}</span>
     </button>
   `;
 
@@ -146,8 +158,10 @@ function renderGroupOption(value: string, label: string, selected: boolean): str
       data-action="select-group-option"
       data-group-value="${escapeHtml(value)}"
     >
-      <span>${escapeHtml(label)}</span>
-      ${selected ? `<span class="group-select__check" aria-hidden="true">${renderCheckIcon()}</span>` : ""}
+      <span class="group-select__label-text">${escapeHtml(label)}</span>
+      <span class="group-select__check${selected ? " group-select__check--on" : ""}" aria-hidden="true">${renderIcon(
+        "tickDouble"
+      )}</span>
     </button>
   `;
 }
@@ -189,10 +203,7 @@ function renderGroups(state: PopupState): void {
         group,
         tabs: state.groupedTabs[groupName] ?? [],
         expanded: state.expandedGroups.has(groupName),
-        menuOpen: state.activeMenuGroupName === groupName,
-        confirmDelete: state.confirmDeleteGroupName === groupName,
-        activeTabMenuId: state.activeTabMenuId,
-        confirmDeleteTabId: state.confirmDeleteTabId
+        activeTabMenuId: state.activeTabMenuId
       })
     );
   }
@@ -204,7 +215,7 @@ function renderNewGroupButton(): HTMLElement {
   button.className = "new-group-button";
   button.dataset.action = "new-group";
   button.innerHTML = `
-    <span class="new-group-button__icon" aria-hidden="true"></span>
+    <span class="new-group-button__icon" aria-hidden="true">${renderIcon("folderAdd")}</span>
     <span>New</span>
   `;
   return button;
@@ -214,18 +225,15 @@ function renderEmptyState(): HTMLElement {
   const empty = document.createElement("div");
   empty.className = "empty-state";
   empty.innerHTML = `
-    <div class="empty-state__content">
-      <div class="empty-state__illustration" aria-hidden="true">
-        <span class="empty-state__glow"></span>
-        <span class="empty-state__sheet"></span>
-        <span class="empty-state__spark empty-state__spark--one"></span>
-        <span class="empty-state__spark empty-state__spark--two"></span>
-        <span class="empty-state__spark empty-state__spark--three"></span>
-      </div>
-      <div class="empty-state__copy">
-        <p class="empty-state__title">No saved tabs yet</p>
-        <p class="empty-state__text">Save a tab to start building your collection and access it anytime.</p>
-      </div>
+    <img
+      class="empty-state__illustration"
+      src="../../public/icons/figma/empty-state.svg"
+      alt=""
+      aria-hidden="true"
+    />
+    <div class="empty-state__copy">
+      <p class="empty-state__title">No saved tabs yet</p>
+      <p class="empty-state__text">Save a tab to start building your collection and access it anytime.</p>
     </div>
   `;
   return empty;
@@ -280,13 +288,7 @@ export function bindPopupEvents(state: PopupState): void {
     const actionable = target.closest("[data-action]");
 
     if (!(actionable instanceof HTMLElement)) {
-      if (
-        !target.closest(".group-options") &&
-        !target.closest(".confirm-popover") &&
-        !target.closest(".tab-inline-panel") &&
-        !target.closest(".group-select") &&
-        !target.closest(".new-group-modal__dialog")
-      ) {
+      if (!target.closest(".popover") && !target.closest(".group-select")) {
         state.activeMenuGroupName = null;
         state.confirmDeleteGroupName = null;
         state.activeTabMenuId = null;
@@ -366,6 +368,16 @@ async function handleAction(
       state.toast = null;
       renderPopup(state);
       focusNewGroupInput();
+      return;
+    case "dismiss-overlay":
+      state.isCreatingGroup = false;
+      state.groupDraft = "";
+      state.validationMessage = null;
+      state.activeMenuGroupName = null;
+      state.confirmDeleteGroupName = null;
+      state.activeTabMenuId = null;
+      state.confirmDeleteTabId = null;
+      renderPopup(state);
       return;
     case "cancel-new-group":
       state.isCreatingGroup = false;
@@ -652,21 +664,174 @@ function renderOverlayState(state: PopupState): void {
   const overlay = getRequiredElement("overlay-slot");
   overlay.replaceChildren();
 
-  if (!state.isCreatingGroup) {
+  const dialog = state.isCreatingGroup || state.confirmDeleteGroupName || state.confirmDeleteTabId;
+  const popover = state.activeMenuGroupName || state.activeTabMenuId;
+
+  if (!dialog && !popover) {
+    overlay.setAttribute("aria-hidden", "true");
     return;
   }
 
+  overlay.removeAttribute("aria-hidden");
+
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
-  backdrop.dataset.action = "cancel-new-group";
+  backdrop.dataset.action = "dismiss-overlay";
   overlay.append(backdrop);
 
-  overlay.append(
-    renderNewGroupInput({
-      value: state.groupDraft,
-      validationMessage: state.validationMessage
-    })
-  );
+  if (state.isCreatingGroup) {
+    overlay.append(
+      renderNewGroupInput({
+        value: state.groupDraft,
+        validationMessage: state.validationMessage
+      })
+    );
+    return;
+  }
+
+  if (state.confirmDeleteGroupName) {
+    overlay.append(
+      renderConfirmDialog({
+        eyebrow: "DELETE TAB GROUP ?",
+        body:
+          "This will remove the group and all its saved tabs from TabSave. " +
+          "If the tabs are currently open in your browser, they may also be closed.",
+        cancelAction: "cancel-delete-group",
+        confirmAction: "delete-group",
+        dataAttribute: "data-group-name",
+        dataValue: state.confirmDeleteGroupName
+      })
+    );
+    return;
+  }
+
+  if (state.confirmDeleteTabId) {
+    overlay.append(
+      renderConfirmDialog({
+        eyebrow: "DELETE TAB",
+        body:
+          "This will remove this tab from TabSave. " +
+          "If the tab is currently open in your browser, they may also be closed.",
+        cancelAction: "cancel-delete-tab",
+        confirmAction: "delete-tab",
+        dataAttribute: "data-tab-id",
+        dataValue: state.confirmDeleteTabId
+      })
+    );
+    return;
+  }
+
+  if (state.activeMenuGroupName) {
+    const menu = renderOpenOptions("open-group", "open-group-new-window", "data-group-name", state.activeMenuGroupName);
+    overlay.append(menu);
+    anchorPopover(
+      menu,
+      `[data-action="toggle-open-menu"][data-group-name="${cssEscape(state.activeMenuGroupName)}"]`
+    );
+    return;
+  }
+
+  if (state.activeTabMenuId) {
+    const menu = renderOpenOptions("open-tab", "open-tab-new-window", "data-tab-id", state.activeTabMenuId);
+    overlay.append(menu);
+    anchorPopover(
+      menu,
+      `[data-action="toggle-open-tab-menu"][data-tab-id="${cssEscape(state.activeTabMenuId)}"]`
+    );
+  }
+}
+
+interface ConfirmDialogProps {
+  eyebrow: string;
+  body: string;
+  cancelAction: string;
+  confirmAction: string;
+  dataAttribute: string;
+  dataValue: string;
+}
+
+function renderConfirmDialog(props: ConfirmDialogProps): HTMLElement {
+  const dialog = document.createElement("div");
+  dialog.className = "popover popover--confirm";
+  dialog.setAttribute("role", "alertdialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-label", props.eyebrow);
+  const payload = `${props.dataAttribute}="${escapeHtml(props.dataValue)}"`;
+  dialog.innerHTML = `
+    <div class="popover__header">
+      <p class="popover__eyebrow">${escapeHtml(props.eyebrow)}</p>
+      <button type="button" class="popover__close" data-action="${props.cancelAction}" ${payload} aria-label="Close">
+        ${renderIcon("cancel01")}
+      </button>
+    </div>
+    <div class="popover__body">
+      <p class="popover__text">${escapeHtml(props.body)}</p>
+      <div class="popover__actions">
+        <button type="button" class="button button--secondary button--fixed" data-action="${
+          props.cancelAction
+        }" ${payload}>Cancel</button>
+        <button type="button" class="button button--danger button--fixed" data-action="${
+          props.confirmAction
+        }" ${payload}>Delete</button>
+      </div>
+    </div>
+  `;
+  return dialog;
+}
+
+function renderOpenOptions(
+  currentAction: string,
+  newWindowAction: string,
+  dataAttribute: string,
+  dataValue: string
+): HTMLElement {
+  const menu = document.createElement("div");
+  menu.className = "popover popover--menu";
+  menu.setAttribute("role", "menu");
+  const payload = `${dataAttribute}="${escapeHtml(dataValue)}"`;
+  menu.innerHTML = `
+    <button type="button" class="menu-option" role="menuitem" data-action="${currentAction}" ${payload}>
+      <span>Open in current window</span>
+      ${renderIcon("windowsNew")}
+    </button>
+    <button type="button" class="menu-option" role="menuitem" data-action="${newWindowAction}" ${payload}>
+      <span>Open in new window</span>
+      ${renderIcon("windowsOld")}
+    </button>
+  `;
+  return menu;
+}
+
+// Places a popover just under its trigger, right-aligned, clamped to the popup frame.
+function anchorPopover(popover: HTMLElement, anchorSelector: string): void {
+  const shell = document.getElementById("app");
+  const anchor = document.querySelector(anchorSelector);
+
+  if (!shell || !(anchor instanceof HTMLElement)) {
+    return;
+  }
+
+  const shellRect = shell.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const width = popover.offsetWidth || 186;
+  const height = popover.offsetHeight || 70;
+
+  const left = clamp(anchorRect.right - shellRect.left - width + 6, 10, shellRect.width - width - 10);
+  const below = anchorRect.bottom - shellRect.top + 8;
+  const top = below + height > shellRect.height - 10
+    ? Math.max(10, anchorRect.top - shellRect.top - height - 8)
+    : below;
+
+  popover.style.left = `${Math.round(left)}px`;
+  popover.style.top = `${Math.round(top)}px`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
+function cssEscape(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
 function showToast(
@@ -731,12 +896,5 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function renderCheckIcon(): string {
-  return `
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M3.5 7.29L5.83 9.62L10.5 4.96" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
-}
 
 bootstrapPopup();

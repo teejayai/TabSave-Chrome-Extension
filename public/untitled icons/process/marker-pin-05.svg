@@ -1,0 +1,18 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="marker-pin-05">
+<g id="Icon" filter="url(#filter0_d_0_14)">
+<path d="M16.6667 13.9317C20.3456 14.655 22.9167 16.307 22.9167 18.2292C22.9167 20.818 18.253 22.9167 12.5 22.9167C6.74703 22.9167 2.08333 20.818 2.08333 18.2292C2.08333 16.307 4.65437 14.655 8.33333 13.9317M12.5 17.7083V3.125L18.0393 6.5338C18.4433 6.78244 18.6454 6.90676 18.7098 7.06339C18.766 7.2 18.7616 7.35406 18.6976 7.4872C18.6242 7.63985 18.4153 7.75231 17.9976 7.97724L12.5 10.9375" stroke="var(--stroke-0, #23AD02)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" shape-rendering="crispEdges"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_0_14" x="1.08333" y="2.125" width="22.8333" height="22.7917" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="1"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 0.0344426 0 0 0 0 0.855166 0 0 0 1 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_14"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_14" result="shape"/>
+</filter>
+</defs>
+</svg>

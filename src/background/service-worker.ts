@@ -33,6 +33,12 @@ export function registerRuntimeListeners(): void {
     void handleInstalled(details);
   });
 
+  if (chrome.runtime.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+      void inheritAndMergeExistingGroups();
+    });
+  }
+
   if (chrome.contextMenus?.onClicked) {
     chrome.contextMenus.onClicked.addListener((info, tab) => {
       void handleContextMenuClick(info, tab);
@@ -58,12 +64,15 @@ export function registerRuntimeListeners(): void {
 export async function handleInstalled(
   details: chrome.runtime.InstalledDetails
 ): Promise<void> {
+  void details;
   await setupContextMenus();
 
-  if (details.reason !== "install") {
-    return;
-  }
+  // Inherit on install AND update so every existing Chrome tab group (across all
+  // open windows) is captured, not just the ones present at first install.
+  await inheritAndMergeExistingGroups();
+}
 
+export async function inheritAndMergeExistingGroups(): Promise<void> {
   const inherited = await inheritExistingTabGroups();
 
   if (inherited.tabs.length === 0 && inherited.groups.length === 0) {
@@ -538,8 +547,26 @@ function dedupeTabsByUrlAndGroup(tabs: SavedTab[]): SavedTab[] {
 function mergeGroups(existing: GroupMeta[], incoming: GroupMeta[]): GroupMeta[] {
   const byName = new Map<string, GroupMeta>();
 
-  for (const group of [...existing, ...incoming]) {
+  for (const group of existing) {
     byName.set(group.name.toLowerCase(), group);
+  }
+
+  // When an inherited Chrome group's name aligns with a group we already track,
+  // keep the existing metadata but adopt the Chrome group link and color so the
+  // two stay synced instead of producing a duplicate.
+  for (const group of incoming) {
+    const key = group.name.toLowerCase();
+    const previous = byName.get(key);
+
+    if (previous) {
+      byName.set(key, {
+        ...previous,
+        color: previous.color ?? group.color,
+        originalGroupId: group.originalGroupId ?? previous.originalGroupId
+      });
+    } else {
+      byName.set(key, group);
+    }
   }
 
   return Array.from(byName.values()).sort((left, right) => left.createdAt - right.createdAt);
@@ -842,10 +869,21 @@ async function ensureChromeGroupAvailable(
     urls?: string[];
   } = {}
 ): Promise<GroupMeta> {
-  const existingChromeGroup = await findExistingChromeGroup(groupMeta.originalGroupId);
+  // Prefer the Chrome group we are already linked to, then fall back to any open
+  // Chrome group whose title matches this group's name so saves automatically
+  // join an existing aligned tab group instead of creating a duplicate.
+  const existingChromeGroup =
+    (await findExistingChromeGroup(groupMeta.originalGroupId)) ??
+    (await findChromeGroupByTitle(groupMeta.name));
 
   if (existingChromeGroup) {
     await updateChromeGroupMetadata(existingChromeGroup.id, groupMeta);
+
+    // Persist the discovered link when it wasn't already stored.
+    if (groupMeta.originalGroupId !== existingChromeGroup.id) {
+      return persistGroupChromeId(groupMeta, existingChromeGroup.id);
+    }
+
     return {
       ...groupMeta,
       originalGroupId: existingChromeGroup.id
@@ -916,6 +954,26 @@ async function findExistingChromeGroup(
     return groups.find((group) => group.id === groupId) ?? null;
   } catch (error) {
     console.error(`Failed to query Chrome tab groups for id ${groupId}`, error);
+    return null;
+  }
+}
+
+async function findChromeGroupByTitle(
+  title: string
+): Promise<chrome.tabGroups.TabGroup | null> {
+  const normalizedTitle = title.trim().toLowerCase();
+
+  if (!normalizedTitle || typeof chrome.tabGroups?.query !== "function") {
+    return null;
+  }
+
+  try {
+    const groups = await chrome.tabGroups.query({});
+    return (
+      groups.find((group) => group.title?.trim().toLowerCase() === normalizedTitle) ?? null
+    );
+  } catch (error) {
+    console.error(`Failed to query Chrome tab groups by title "${title}"`, error);
     return null;
   }
 }
